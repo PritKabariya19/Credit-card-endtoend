@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CreckFraud | Multi-Model Detection Platform</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vanilla-tilt/1.8.0/vanilla-tilt.min.js"></script>
+    <style>
+        :root {
+            --bg: #0a0e1a;
+            --surface: rgba(15, 23, 42, 0.6);
+            --surface-solid: #0f172a;
+            --accent: #06b6d4;
+            --accent2: #8b5cf6;
+            --accent3: #ec4899;
+            --green: #22c55e;
+            --red: #ef4444;
+            --yellow: #eab308;
+            --text: #e2e8f0;
+            --text-dim: #64748b;
+            --border: rgba(255,255,255,0.06);
+            --glow-cyan: rgba(6, 182, 212, 0.15);
+            --glow-purple: rgba(139, 92, 246, 0.15);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ── Three.js Canvas ── */
+        #three-canvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* ── Navbar ── */
+        .navbar {
+            position: sticky; top: 0; z-index: 100;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0.75rem 2rem;
+            background: rgba(10, 14, 26, 0.85);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .navbar-brand {
+            display: flex; align-items: center; gap: 0.75rem;
+            font-size: 1.25rem; font-weight: 700;
+        }
+
+        .navbar-brand .logo-icon {
+            width: 36px; height: 36px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem; color: #fff;
+            box-shadow: 0 0 20px var(--glow-cyan);
+        }
+
+        .nav-status {
+            display: flex; align-items: center; gap: 0.5rem;
+            font-size: 0.85rem; color: var(--text-dim);
+        }
+
+        .nav-status .dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 8px var(--green);
+            animation: blink 2s infinite;
+        }
+
+        @keyframes blink {
+            0%,100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* ── Sections ── */
+        .page-wrapper {
+            position: relative; z-index: 1;
+        }
+
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            padding: 5rem 2rem 3rem;
+            position: relative;
+        }
+
+        .hero h1 {
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-weight: 800;
+            line-height: 1.15;
+            margin-bottom: 1rem;
+        }
+
+        .hero h1 .gradient-text {
+            background: linear-gradient(135deg, var(--accent), var(--accent2), var(--accent3));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero p {
+            font-size: 1.15rem;
+            color: var(--text-dim);
+            max-width: 650px;
+            margin: 0 auto 2rem;
+            line-height: 1.6;
+        }
+
+        .hero .scroll-cta {
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            padding: 0.75rem 1.75rem;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            color: #fff; font-weight: 600;
+            border: none; border-radius: 50px;
+            font-size: 1rem;
+            cursor: pointer;
+            text-decoration: none;
+            box-shadow: 0 4px 25px var(--glow-cyan);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .hero .scroll-cta:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 35px var(--glow-purple);
+        }
+
+        /* Stats Row */
+        .stats-row {
+            display: flex; justify-content: center; gap: 3rem;
+            padding: 2rem; flex-wrap: wrap;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-item .stat-val {
+            font-size: 2rem; font-weight: 800;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .stat-item .stat-label {
+            font-size: 0.85rem; color: var(--text-dim); margin-top: 0.25rem;
+        }
+
+        /* ── Dashboard Section ── */
+        .dashboard {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+
+        @media (min-width: 1100px) {
+            .dashboard { grid-template-columns: 420px 1fr; }
+        }
+
+        /* Glass Card */
+        .card-3d {
+            background: var(--surface);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            transform-style: preserve-3d;
+            transition: box-shadow 0.3s;
+        }
+
+        .card-3d:hover {
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5), 0 0 30px var(--glow-cyan);
+        }
+
+        .card-header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between;
+            background: rgba(15, 23, 42, 0.8);
+        }
+
+        .card-header h2 {
+            font-size: 1rem; font-weight: 600;
+            display: flex; align-items: center; gap: 0.5rem;
+        }
+
+        .card-header h2 i { color: var(--accent); }
+
+        .card-body { padding: 1.5rem; }
+
+        /* ── Samples ── */
+        .sample-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .sample-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.25s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sample-card::before {
+            content: '';
+            position: absolute; inset: 0;
+            background: linear-gradient(135deg, transparent, rgba(6,182,212,0.05));
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .sample-card:hover::before { opacity: 1; }
+
+        .sample-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 10px 25px rgba(6,182,212,0.1);
+        }
+
+        .sample-card .sample-icon {
+            font-size: 1.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .sample-card .sample-name {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .sample-card .sample-tag {
+            display: inline-block;
+            margin-top: 0.5rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 50px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        .tag-safe { background: rgba(34,197,94,0.15); color: var(--green); }
+        .tag-danger { background: rgba(239,68,68,0.15); color: var(--red); }
+        .tag-warn { background: rgba(234,179,8,0.15); color: var(--yellow); }
+
+        /* ── Input Grid ── */
+        .input-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+            gap: 0.75rem;
+            max-height: 320px;
+            overflow-y: auto;
+            padding-right: 0.5rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .input-grid::-webkit-scrollbar { width: 4px; }
+        .input-grid::-webkit-scrollbar-track { background: transparent; }
+        .input-grid::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 4px; }
+
+        .form-group {
+            display: flex; flex-direction: column; gap: 0.2rem;
+        }
+
+        .form-group label {
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .form-group input {
+            padding: 0.45rem 0.5rem;
+            background: rgba(0,0,0,0.4);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--accent);
+            font-size: 0.85rem;
+            font-family: 'JetBrains Mono', monospace;
+            outline: none;
+            transition: all 0.2s;
+            width: 100%;
+        }
+
+        .form-group input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 12px var(--glow-cyan);
+        }
+
+        /* ── Submit Button ── */
+        .btn-scan {
+            width: 100%;
+            padding: 0.85rem;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+            box-shadow: 0 4px 20px var(--glow-cyan);
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-scan::after {
+            content: '';
+            position: absolute; top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: linear-gradient(transparent, rgba(255,255,255,0.1), transparent);
+            transform: rotate(45deg);
+            transition: all 0.5s;
+        }
+
+        .btn-scan:hover::after { top: 100%; }
+        .btn-scan:hover { transform: translateY(-2px); box-shadow: 0 8px 30px var(--glow-purple); }
+        .btn-scan:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+        .loader {
+            width: 18px; height: 18px;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-top: 2px solid #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* ── Right Dashboard ── */
+        .results-col { display: flex; flex-direction: column; gap: 1.5rem; }
+
+        /* Consensus */
+        .consensus-panel {
+            display: none;
+            background: var(--surface);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .consensus-panel::before {
+            content: '';
+            position: absolute; top: 0; left: 0; right: 0; height: 3px;
+            border-radius: 16px 16px 0 0;
+        }
+
+        .consensus-panel.legit::before { background: linear-gradient(90deg, var(--green), var(--accent)); }
+        .consensus-panel.fraud::before { background: linear-gradient(90deg, var(--red), var(--accent3)); }
+
+        .consensus-label {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.75rem;
+        }
+
+        .consensus-verdict {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 0.5rem;
+        }
+
+        .consensus-verdict.legit { color: var(--green); text-shadow: 0 0 30px rgba(34,197,94,0.3); }
+        .consensus-verdict.fraud { color: var(--red); text-shadow: 0 0 30px rgba(239,68,68,0.3); }
+
+        .consensus-conf {
+            font-size: 1.1rem;
+            color: var(--text-dim);
+        }
+
+        .consensus-conf span {
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        /* ── Model Cards Grid ── */
+        .model-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+        }
+
+        .model-tile {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 1.25rem;
+            transition: all 0.3s;
+            transform-style: preserve-3d;
+        }
+
+        .model-tile:hover {
+            border-color: rgba(6,182,212,0.3);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3), 0 0 15px var(--glow-cyan);
+        }
+
+        .model-tile-header {
+            display: flex; align-items: center; gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .model-tile-icon {
+            width: 38px; height: 38px;
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .model-tile-name {
+            font-weight: 700;
+            font-size: 0.95rem;
+        }
+
+        .model-tile-status {
+            font-size: 0.7rem;
+            color: var(--green);
+            display: flex; align-items: center; gap: 0.3rem;
+        }
+
+        .model-tile-status .mini-dot {
+            width: 5px; height: 5px; border-radius: 50%; background: var(--green);
+        }
+
+        .model-tile-result {
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            padding: 1rem;
+            text-align: center;
+            min-height: 90px;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            border: 1px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .model-tile-result.waiting { color: var(--text-dim); font-style: italic; font-size: 0.85rem; }
+
+        .model-tile-result.legit {
+            border-color: rgba(34,197,94,0.2);
+            box-shadow: inset 0 0 20px rgba(34,197,94,0.05);
+        }
+
+        .model-tile-result.fraud {
+            border-color: rgba(239,68,68,0.2);
+            box-shadow: inset 0 0 20px rgba(239,68,68,0.05);
+            animation: fraudPulse 2s infinite;
+        }
+
+        @keyframes fraudPulse {
+            0%,100% { box-shadow: inset 0 0 20px rgba(239,68,68,0.05); }
+            50% { box-shadow: inset 0 0 30px rgba(239,68,68,0.15); }
+        }
+
+        .result-verdict {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+
+        .result-verdict.legit { color: var(--green); }
+        .result-verdict.fraud { color: var(--red); }
+
+        .result-conf { font-size: 0.85rem; color: var(--text-dim); }
+        .result-time { font-size: 0.75rem; color: var(--text-dim); margin-top: 0.5rem; display: flex; align-items: center; gap: 0.3rem; }
+
+        /* ── Footer ── */
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-dim);
+            font-size: 0.8rem;
+            border-top: 1px solid var(--border);
+            margin-top: 3rem;
+        }
+
+        /* ── Animations ── */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-up { animation: fadeUp 0.6s ease forwards; }
+        .delay-1 { animation-delay: 0.1s; opacity: 0; }
+        .delay-2 { animation-delay: 0.2s; opacity: 0; }
+        .delay-3 { animation-delay: 0.3s; opacity: 0; }
+
+        .error-msg {
+            text-align: center; margin-top: 0.5rem;
+            font-size: 0.8rem; color: var(--red);
+            min-height: 1.2em;
+        }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            .sample-grid { grid-template-columns: 1fr; }
+            .stats-row { gap: 1.5rem; }
+            .navbar { padding: 0.75rem 1rem; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Three.js 3D Background -->
+<canvas id="three-canvas"></canvas>
+
+<div class="page-wrapper">
+
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="navbar-brand">
+            <div class="logo-icon"><i class="fas fa-shield-alt"></i></div>
+            <span>Creck<span style="color:var(--accent)">Fraud</span></span>
+        </div>
+        <div class="nav-status">
+            <div class="dot"></div>
+            <span id="modelCount">Loading models...</span>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero fade-up">
+        <h1>Credit Card <span class="gradient-text">Fraud Detection</span><br>AI Dashboard</h1>
+        <p>Check if a transaction is safe or fraud using multiple AI models at once.
+           Compare results, see how sure each model is, and how fast it runs.</p>
+        <a href="#dashboard" class="scroll-cta">
+            <i class="fas fa-bolt"></i> Start Analysis
+        </a>
+    </section>
+
+    <!-- Stats -->
+    <div class="stats-row fade-up delay-1" id="statsRow">
+        <div class="stat-item"><div class="stat-val" id="statModels">--</div><div class="stat-label">AI Models</div></div>
+        <div class="stat-item"><div class="stat-val">31</div><div class="stat-label">Input Fields</div></div>
+        <div class="stat-item"><div class="stat-val">3</div><div class="stat-label">Sample Data</div></div>
+        <div class="stat-item"><div class="stat-val">&lt;50ms</div><div class="stat-label">Speed</div></div>
+    </div>
+
+    <!-- Dashboard -->
+    <section class="dashboard fade-up delay-2" id="dashboard">
+
+        <!-- Left: Input -->
+        <div class="card-3d" data-tilt data-tilt-max="3" data-tilt-speed="400" data-tilt-glare="true" data-tilt-max-glare="0.08">
+            <div class="card-header">
+                <h2><i class="fas fa-database"></i> Enter Transaction Data</h2>
+            </div>
+            <div class="card-body">
+                <div style="font-size:0.8rem; color:var(--text-dim); margin-bottom:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">Try Sample Data</div>
+                <div class="sample-grid" id="sampleGrid">
+                    <div class="sample-card" style="opacity:0.5"><div class="loader" style="display:block; margin:0 auto;"></div></div>
+                    <div class="sample-card" style="opacity:0.5"><div class="loader" style="display:block; margin:0 auto;"></div></div>
+                    <div class="sample-card" style="opacity:0.5"><div class="loader" style="display:block; margin:0 auto;"></div></div>
+                </div>
+
+                <div style="font-size:0.8rem; color:var(--text-dim); margin-bottom:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">Input Values (31 Fields)</div>
+                <div class="input-grid" id="inputGrid"></div>
+
+                <button class="btn-scan" id="scanBtn" onclick="runAnalysis()">
+                    <span id="btnLabel"><i class="fas fa-search"></i> Check All Models</span>
+                    <div class="loader" id="btnLoader"></div>
+                </button>
+                <div class="error-msg" id="errorMsg"></div>
+            </div>
+        </div>
+
+        <!-- Right: Results -->
+        <div class="results-col">
+
+            <div class="consensus-panel" id="consensusPanel">
+                <div class="consensus-label">Overall Result</div>
+                <div class="consensus-verdict" id="verdictText">--</div>
+                <div class="consensus-conf">Models Agree: <span id="confScore">--%</span></div>
+            </div>
+
+            <div class="card-3d" data-tilt data-tilt-max="2" data-tilt-speed="400" data-tilt-glare="true" data-tilt-max-glare="0.05">
+                <div class="card-header">
+                    <h2><i class="fas fa-network-wired"></i> Each Model's Result</h2>
+                </div>
+                <div class="card-body">
+                    <div class="model-grid" id="modelGrid">
+                        <p style="color:var(--text-dim); grid-column:1/-1; text-align:center; padding:2rem 0;">
+                            <i class="fas fa-search" style="font-size:1.5rem; display:block; margin-bottom:0.5rem; opacity:0.3;"></i>
+                            Enter data and click "Check All Models"...
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <footer>
+        CreckFraud &middot; Multi-Model Detection Platform &middot; Hackathon 2026
+    </footer>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// THREE.JS 3D PARTICLE BACKGROUND
+// ═══════════════════════════════════════════
+(function() {
+    const canvas = document.getElementById('three-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.z = 30;
+
+    // Particles
+    const particleCount = 1200;
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(particleCount * 3);
+    const colors = new Float32Array(particleCount * 3);
+
+    const cyan = new THREE.Color(0x06b6d4);
+    const purple = new THREE.Color(0x8b5cf6);
+    const pink = new THREE.Color(0xec4899);
+    const palette = [cyan, purple, pink];
+
+    for (let i = 0; i < particleCount; i++) {
+        positions[i * 3] = (Math.random() - 0.5) * 80;
+        positions[i * 3 + 1] = (Math.random() - 0.5) * 80;
+        positions[i * 3 + 2] = (Math.random() - 0.5) * 80;
+
+        const c = palette[Math.floor(Math.random() * palette.length)];
+        colors[i * 3] = c.r;
+        colors[i * 3 + 1] = c.g;
+        colors[i * 3 + 2] = c.b;
+    }
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    const material = new THREE.PointsMaterial({
+        size: 0.15,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.7,
+        blending: THREE.AdditiveBlending,
+        sizeAttenuation: true,
+    });
+
+    const points = new THREE.Points(geometry, material);
+    scene.add(points);
+
+    // Wireframe sphere
+    const sphereGeo = new THREE.IcosahedronGeometry(12, 2);
+    const wireMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4, wireframe: true, transparent: true, opacity: 0.06 });
+    const sphere = new THREE.Mesh(sphereGeo, wireMat);
+    scene.add(sphere);
+
+    // Second rotating ring
+    const torusGeo = new THREE.TorusGeometry(18, 0.05, 16, 100);
+    const torusMat = new THREE.MeshBasicMaterial({ color: 0x8b5cf6, transparent: true, opacity: 0.15 });
+    const torus = new THREE.Mesh(torusGeo, torusMat);
+    torus.rotation.x = 1.2;
+    scene.add(torus);
+
+    let mouseX = 0, mouseY = 0;
+    document.addEventListener('mousemove', (e) => {
+        mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
+        mouseY = (e.clientY / window.innerHeight - 0.5) * 2;
+    });
+
+    function animate() {
+        requestAnimationFrame(animate);
+        points.rotation.y += 0.0008;
+        points.rotation.x += 0.0003;
+        sphere.rotation.y += 0.002;
+        sphere.rotation.x += 0.001;
+        torus.rotation.z += 0.003;
+
+        camera.position.x += (mouseX * 3 - camera.position.x) * 0.02;
+        camera.position.y += (-mouseY * 3 - camera.position.y) * 0.02;
+        camera.lookAt(scene.position);
+
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+})();
+
+// ═══════════════════════════════════════════
+// APPLICATION LOGIC
+// ═══════════════════════════════════════════
+const API = '';
+let availableModels = {};
+
+document.addEventListener('DOMContentLoaded', async () => {
+    buildInputFields();
+    await loadModels();
+    await loadSamples();
+    VanillaTilt.init(document.querySelectorAll("[data-tilt]"));
+});
+
+function buildInputFields() {
+    const grid = document.getElementById('inputGrid');
+    const names = ['Time','V1','V2','V3','V4','V5','V6','V7','V8','V9','V10',
+                   'V11','V12','V13','V14','V15','V16','V17','V18','V19','V20',
+                   'V21','V22','V23','V24','V25','V26','V27','V28','Amount','Class'];
+    names.forEach((n, i) => {
+        const div = document.createElement('div');
+        div.className = 'form-group';
+        div.innerHTML = `<label for="f${i}">${n}</label><input type="number" step="any" id="f${i}" value="0">`;
+        grid.appendChild(div);
+    });
+}
+
+function fillInputs(arr) {
+    arr.forEach((v, i) => {
+        const el = document.getElementById(`f${i}`);
+        if (el) el.value = v;
+    });
+}
+
+function getInputs() {
+    const a = [];
+    for (let i = 0; i < 31; i++) a.push(parseFloat(document.getElementById(`f${i}`).value));
+    return a;
+}
+
+async function loadModels() {
+    try {
+        const r = await fetch(`${API}/api/models`);
+        const d = await r.json();
+        availableModels = d.models;
+        const count = Object.keys(availableModels).length;
+        document.getElementById('modelCount').textContent = `${count} Models Online`;
+        document.getElementById('statModels').textContent = count;
+        buildModelGrid();
+    } catch(e) {
+        document.getElementById('modelCount').textContent = 'Connection Error';
+    }
+}
+
+function buildModelGrid() {
+    const grid = document.getElementById('modelGrid');
+    grid.innerHTML = '';
+    Object.entries(availableModels).forEach(([key, info]) => {
+        const tile = document.createElement('div');
+        tile.className = 'model-tile';
+        tile.setAttribute('data-tilt', '');
+        tile.setAttribute('data-tilt-max', '8');
+        tile.setAttribute('data-tilt-speed', '400');
+        tile.innerHTML = `
+            <div class="model-tile-header">
+                <div class="model-tile-icon" style="background:${info.color}20; color:${info.color};">${info.icon}</div>
+                <div>
+                    <div class="model-tile-name">${info.name}</div>
+                    <div class="model-tile-status"><div class="mini-dot"></div> Online</div>
+                </div>
+            </div>
+            <div class="model-tile-result waiting" id="res-${key}">
+                <i class="fas fa-satellite-dish" style="opacity:0.3; margin-bottom:0.3rem;"></i>
+                Awaiting input
+            </div>
+        `;
+        grid.appendChild(tile);
+    });
+    VanillaTilt.init(document.querySelectorAll(".model-tile"));
+}
+
+async function loadSamples() {
+    try {
+        const r = await fetch(`${API}/api/samples`);
+        const d = await r.json();
+        const grid = document.getElementById('sampleGrid');
+        grid.innerHTML = '';
+        d.samples.forEach(s => {
+            const tagClass = s.label === 'Normal' ? 'tag-safe' : (s.label === 'Fraud' ? 'tag-danger' : 'tag-warn');
+            const icon = s.label === 'Normal' ? '🛡️' : (s.label === 'Fraud' ? '🚨' : '⚠️');
+            const card = document.createElement('div');
+            card.className = 'sample-card';
+            card.title = s.description;
+            card.innerHTML = `
+                <div class="sample-icon">${icon}</div>
+                <div class="sample-name">${s.label === 'Normal' ? 'Safe Example' : (s.label === 'Fraud' ? 'Fraud Example' : 'Tricky Example')}</div>
+                <div class="sample-tag ${tagClass}">${s.label}</div>
+            `;
+            card.onclick = () => fillInputs(s.data);
+            grid.appendChild(card);
+        });
+    } catch(e) {
+        console.error(e);
+    }
+}
+
+async function runAnalysis() {
+    const btn = document.getElementById('scanBtn');
+    const label = document.getElementById('btnLabel');
+    const loader = document.getElementById('btnLoader');
+    const errEl = document.getElementById('errorMsg');
+    const panel = document.getElementById('consensusPanel');
+
+    errEl.textContent = '';
+    const arr = getInputs();
+    if (arr.some(isNaN)) {
+        errEl.textContent = 'All 31 fields must contain valid numbers.';
+        return;
+    }
+
+    // UI loading state
+    btn.disabled = true;
+    label.style.display = 'none';
+    loader.style.display = 'block';
+    panel.style.display = 'block';
+
+    // Reset model tiles
+    Object.keys(availableModels).forEach(k => {
+        const el = document.getElementById(`res-${k}`);
+        el.className = 'model-tile-result';
+        el.innerHTML = '<div class="loader" style="display:block; margin:0 auto;"></div>';
+    });
+
+    document.getElementById('verdictText').textContent = 'Analyzing...';
+    document.getElementById('verdictText').className = 'consensus-verdict';
+    document.getElementById('confScore').textContent = '--%';
+    panel.className = 'consensus-panel';
+
+    try {
+        const resp = await fetch(`${API}/predict/all`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ input: arr })
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Server error');
+
+        const results = data.results;
+        const consensus = data.consensus;
+
+        // Fill model tiles
+        Object.entries(availableModels).forEach(([key, info]) => {
+            const el = document.getElementById(`res-${key}`);
+            const r = results[key];
+            if (r && r.prediction !== null) {
+                const fraud = r.prediction === 1;
+                el.className = `model-tile-result ${fraud ? 'fraud' : 'legit'}`;
+                const prob = r.probability !== null ? `${(r.probability * 100).toFixed(1)}%` : 'N/A';
+                el.innerHTML = `
+                    <div class="result-verdict ${fraud ? 'fraud' : 'legit'}">
+                        <i class="fas ${fraud ? 'fa-exclamation-triangle' : 'fa-check-circle'}"></i>
+                        ${fraud ? 'FRAUD' : 'SAFE'}
+                    </div>
+                    <div class="result-conf">Confidence: ${prob}</div>
+                    <div class="result-time"><i class="fas fa-clock"></i> ${r.inference_time_ms}ms</div>
+                `;
+            } else {
+                el.className = 'model-tile-result';
+                el.innerHTML = '<span style="color:var(--red)"><i class="fas fa-times"></i> Error</span>';
+            }
+        });
+
+        // Update consensus
+        const isFraud = consensus.verdict === 'FRAUD';
+        document.getElementById('verdictText').textContent = isFraud ? 'FRAUD DETECTED' : 'SAFE TRANSACTION';
+        document.getElementById('verdictText').className = `consensus-verdict ${isFraud ? 'fraud' : 'legit'}`;
+        document.getElementById('confScore').textContent = `${consensus.confidence}%`;
+        panel.className = `consensus-panel ${isFraud ? 'fraud' : 'legit'}`;
+
+    } catch(e) {
+        errEl.textContent = e.message;
+        document.getElementById('verdictText').textContent = 'ERROR';
+        document.getElementById('verdictText').className = 'consensus-verdict fraud';
+    } finally {
+        btn.disabled = false;
+        loader.style.display = 'none';
+        label.style.display = 'flex';
+        label.innerHTML = '<i class="fas fa-redo"></i> Check Again';
+    }
+}
+</script>
+</body>
+</html>
