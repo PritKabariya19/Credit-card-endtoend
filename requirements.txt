@@ -1,7 +1,10 @@
-streamlit==1.28.1
-numpy==1.26.4
-joblib==1.4.0
-scikit-learn==1.4.2
-xgboost==2.0.3
-lightgbm==4.3.0
-tensorflow==2.14.0
+streamlit==1.35.0
+numpy<2.0
+pandas
+joblib
+scikit-learn
+xgboost
+lightgbm
+tensorflow-cpu==2.13.0
+Pillow
+plotly
