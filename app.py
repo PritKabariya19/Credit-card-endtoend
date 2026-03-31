@@ -154,6 +154,9 @@ elif page == "Test Model":
                     
                     except Exception as e:
                         st.error(f"Error making prediction: {str(e)}")
+        
+        except Exception as e:
+            st.error(f"Error loading model: {str(e)}")
 
 # ABOUT PAGE
 elif page == "About":
