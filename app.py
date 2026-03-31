@@ -189,18 +189,18 @@ elif page == "About":
 
 st.write("---")
 st.write("Built with ❤️ using Streamlit")
-    
-    st.markdown("---")
-    st.markdown("""
-    <div class='card'>
-        <h4 style='color: #00d4ff;'>📌 Quick Tips</h4>
-        <p style='font-size: 0.9em; color: #2a2a2a;'>
-        • Use sample data for quick tests<br>
-        • Compare models for better insights<br>
-        • Check analytics for performance metrics
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+
+st.markdown("---")
+st.markdown("""
+<div class='card'>
+    <h4 style='color: #00d4ff;'>📌 Quick Tips</h4>
+    <p style='font-size: 0.9em; color: #2a2a2a;'>
+    • Use sample data for quick tests<br>
+    • Compare models for better insights<br>
+    • Check analytics for performance metrics
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PAGE: DASHBOARD
