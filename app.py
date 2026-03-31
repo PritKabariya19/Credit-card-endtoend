@@ -1,16 +1,20 @@
 import streamlit as st
 import joblib
 import numpy as np
+import pandas as pd
 import os
 import time
 from pathlib import Path
+import warnings
+warnings.filterwarnings("ignore")
 
 # Set page config
 st.set_page_config(
     page_title="Credit Card Fraud Detection",
     page_icon="🛡️",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
+    menu_items={"About": "Credit Card Fraud Detection System v1.0"}
 )
 
 # Custom styling
@@ -23,6 +27,19 @@ st.markdown("""
         background-color: #f0f2f6;
         padding: 1rem;
         border-radius: 8px;
+        border-left: 4px solid #0066cc;
+    }
+    .fraud-alert {
+        background-color: #fee;
+        border-left: 4px solid #f00;
+        padding: 1rem;
+        border-radius: 4px;
+    }
+    .safe-alert {
+        background-color: #efe;
+        border-left: 4px solid #0a0;
+        padding: 1rem;
+        border-radius: 4px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -37,11 +54,21 @@ def load_all_models():
     """Load all .pkl models and the keras ANN model from the models directory."""
     models = {}
     scaler = None
+    status_messages = []
+    
+    # Create models directory if it doesn't exist
+    Path(MODELS_DIR).mkdir(exist_ok=True)
     
     # Load scaler
     scaler_path = os.path.join(MODELS_DIR, "robust_scaler.pkl")
     if os.path.exists(scaler_path):
-        scaler = joblib.load(scaler_path)
+        try:
+            scaler = joblib.load(scaler_path)
+            status_messages.append(("✅", "RobustScaler loaded"))
+        except Exception as e:
+            status_messages.append(("❌", f"Scaler load failed: {str(e)[:50]}"))
+    else:
+        status_messages.append(("⚠️", "Scaler not found"))
     
     # Load sklearn/xgboost/lightgbm models
     model_files = {
@@ -56,8 +83,11 @@ def load_all_models():
         if os.path.exists(path):
             try:
                 models[name] = joblib.load(path)
+                status_messages.append(("✅", f"{name.replace('_', ' ').title()} loaded"))
             except Exception as e:
-                st.warning(f"Failed to load {filename}: {e}")
+                status_messages.append(("❌", f"{name} failed: {str(e)[:40]}"))
+        else:
+            status_messages.append(("⚠️", f"{name} model missing"))
     
     # Load Keras ANN model
     ann_path = os.path.join(MODELS_DIR, "ann_model.keras")
@@ -65,23 +95,27 @@ def load_all_models():
         try:
             import tensorflow as tf
             models["ann"] = tf.keras.models.load_model(ann_path)
+            status_messages.append(("✅", "Neural Network (ANN) loaded"))
         except ImportError:
-            st.warning("TensorFlow not installed. ANN model will not be available.")
+            status_messages.append(("❌", "TensorFlow not installed"))
         except Exception as e:
-            st.warning(f"Failed to load ANN model: {e}")
+            status_messages.append(("❌", f"ANN load failed: {str(e)[:40]}"))
+    else:
+        status_messages.append(("⚠️", "ANN model not found"))
     
     # Load tuned XGBoost if available
     tuned_path = os.path.join(MODELS_DIR, "best_xgb_tuned.pkl")
     if os.path.exists(tuned_path):
         try:
             models["xgboost_tuned"] = joblib.load(tuned_path)
+            status_messages.append(("✅", "Tuned XGBoost loaded"))
         except Exception as e:
-            st.warning(f"Failed to load tuned XGBoost: {e}")
+            status_messages.append(("❌", f"Tuned XGBoost failed: {str(e)[:40]}"))
     
-    return models, scaler
+    return models, scaler, status_messages
 
 # Load models
-models, scaler = load_all_models()
+models, scaler, model_status = load_all_models()
 
 # Model information
 MODEL_INFO = {
@@ -251,9 +285,18 @@ def display_header():
     with col1:
         st.metric("Loaded Models", len(models))
     with col2:
-        st.metric("Total Features", "31")
+        st.metric("Total Features", "31 (30 PCA + Time/Amount)")
     with col3:
         st.metric("Prediction Method", "Ensemble Voting")
+    
+    # Show model status
+    with st.expander("📋 Model Status Details"):
+        for icon, msg in model_status:
+            st.write(f"{icon} {msg}")
+    
+    if len(models) == 0:
+        st.error("⚠️ No models loaded! Please check the models/ directory.")
+        st.stop()
 
 def display_home():
     """Display home page."""
@@ -297,14 +340,23 @@ def display_single_model():
     
     # Model selection
     available_models = list(models.keys())
-    selected_model = st.selectbox("Select Model", available_models)
+    if not available_models:
+        st.error("No models available!")
+        return
+    
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        selected_model = st.selectbox("Select Model", available_models)
+    with col2:
+        st.write("")  # Spacing
     
     model_info = MODEL_INFO.get(selected_model, {})
-    st.info(f"{model_info.get('icon', '🤖')} {model_info.get('description', '')}")
+    st.info(f"{model_info.get('icon', '🤖')} **{model_info.get('name', selected_model)}**: {model_info.get('description', '')}")
     
     # Input method selection
-    input_method = st.radio("Input Method", ["Manual Input", "Sample Data"])
+    input_method = st.radio("Input Method", ["Manual Input", "Sample Data"], horizontal=True)
     
+    features = None
     if input_method == "Sample Data":
         sample_key = st.selectbox("Select Sample", SAMPLE_DATA.keys(), 
                                   format_func=lambda k: SAMPLE_DATA[k]["name"])
@@ -312,11 +364,11 @@ def display_single_model():
         st.info(SAMPLE_DATA[sample_key]["description"])
     else:
         # Manual input
-        st.subheader("Enter Features")
+        st.subheader("Enter Features (31 Total)")
         col1, col2 = st.columns(2)
         
-        time_val = col1.number_input("Time (seconds)", value=0.0, step=100.0)
-        amount_val = col2.number_input("Amount ($)", value=0.0, step=1.0, format="%.2f")
+        time_val = col1.number_input("Time (seconds)", value=0.0, step=100.0, min_value=0.0)
+        amount_val = col2.number_input("Amount ($)", value=0.0, step=1.0, format="%.2f", min_value=0.0)
         
         st.markdown("**PCA Features (V1-V28)**")
         v_features = []
@@ -324,33 +376,42 @@ def display_single_model():
             cols = st.columns(7)
             for j in range(7):
                 if i + j < 28:
-                    v_features.append(cols[j].number_input(f"V{i+j+1}", value=0.0, step=0.1, key=f"v_{i+j}"))
+                    val = cols[j].number_input(f"V{i+j+1}", value=0.0, step=0.1, key=f"v_{i+j}", format="%.3f")
+                    v_features.append(val)
         
         features = [time_val] + v_features + [amount_val]
     
     # Make prediction
     if st.button("🚀 Predict", use_container_width=True, type="primary"):
-        prediction, prob, status, elapsed = predict_single(selected_model, features)
+        with st.spinner("Running prediction..."):
+            prediction, prob, status, elapsed = predict_single(selected_model, features)
         
         st.markdown("---")
         st.subheader("Prediction Result")
         
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Status", status)
-        with col2:
-            if prob is not None:
-                st.metric("Probability", f"{prob:.4f}")
-        with col3:
-            st.metric("Inference Time", f"{elapsed}ms")
+        if prediction is None:
+            st.error(f"Prediction failed: {status}")
+        else:
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                if "Fraud" in status:
+                    st.markdown(f"<div class='fraud-alert'>**{status}**</div>", unsafe_allow_html=True)
+                else:
+                    st.markdown(f"<div class='safe-alert'>**{status}**</div>", unsafe_allow_html=True)
+            with col2:
+                if prob is not None:
+                    st.metric("Fraud Probability", f"{prob:.4f}", f"{prob*100:.2f}%")
+            with col3:
+                st.metric("Inference Time", f"{elapsed} ms")
 
 def display_all_models():
     """Display all models comparison."""
-    st.header("⚖️ Compare All Models");
+    st.header("⚖️ Compare All Models")
     
     # Input method selection
-    input_method = st.radio("Input Method", ["Manual Input", "Sample Data"], key="all_models_input")
+    input_method = st.radio("Input Method", ["Manual Input", "Sample Data"], horizontal=True, key="all_models_input")
     
+    features = None
     if input_method == "Sample Data":
         sample_key = st.selectbox("Select Sample", SAMPLE_DATA.keys(), 
                                   format_func=lambda k: SAMPLE_DATA[k]["name"],
@@ -359,11 +420,11 @@ def display_all_models():
         st.info(SAMPLE_DATA[sample_key]["description"])
     else:
         # Manual input
-        st.subheader("Enter Features")
+        st.subheader("Enter Features (31 Total)")
         col1, col2 = st.columns(2)
         
-        time_val = col1.number_input("Time (seconds)", value=0.0, step=100.0, key="all_time")
-        amount_val = col2.number_input("Amount ($)", value=0.0, step=1.0, format="%.2f", key="all_amount")
+        time_val = col1.number_input("Time (seconds)", value=0.0, step=100.0, min_value=0.0, key="all_time")
+        amount_val = col2.number_input("Amount ($)", value=0.0, step=1.0, format="%.2f", min_value=0.0, key="all_amount")
         
         st.markdown("**PCA Features (V1-V28)**")
         v_features = []
@@ -371,41 +432,62 @@ def display_all_models():
             cols = st.columns(7)
             for j in range(7):
                 if i + j < 28:
-                    v_features.append(cols[j].number_input(f"V{i+j+1}", value=0.0, step=0.1, key=f"all_v_{i+j}"))
+                    val = cols[j].number_input(f"V{i+j+1}", value=0.0, step=0.1, key=f"all_v_{i+j}", format="%.3f")
+                    v_features.append(val)
         
         features = [time_val] + v_features + [amount_val]
     
     # Make predictions
     if st.button("🚀 Predict with All Models", use_container_width=True, type="primary"):
-        results, consensus = predict_all(features)
+        with st.spinner("Running predictions with all models..."):
+            results, consensus = predict_all(features)
         
         st.markdown("---")
         st.subheader("🎯 Consensus Verdict")
         
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            st.metric("Verdict", consensus["verdict"])
+            verdict_text = consensus["verdict"]
+            is_fraud = "FRAUD" in verdict_text
+            if is_fraud:
+                st.markdown(f"<div class='fraud-alert'>**{verdict_text}**</div>", unsafe_allow_html=True)
+            else:
+                st.markdown(f"<div class='safe-alert'>**{verdict_text}**</div>", unsafe_allow_html=True)
         with col2:
             st.metric("Confidence", f"{consensus['confidence']}%")
         with col3:
-            st.metric("Fraud Votes", consensus["fraud_votes"])
+            st.metric("🔴 Fraud Votes", consensus["fraud_votes"])
         with col4:
-            st.metric("Normal Votes", consensus["normal_votes"])
+            st.metric("🟢 Normal Votes", consensus["normal_votes"])
         
         st.markdown("---")
         st.subheader("📊 Individual Model Results")
         
+        # Create a summary table
+        summary_data = []
         for model_name, result in results.items():
             model_info = MODEL_INFO.get(model_name, {})
-            with st.expander(f"{model_info.get('icon', '🤖')} {model_info.get('name', model_name)}"):
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Status", result["status"])
-                with col2:
+            summary_data.append({
+                "Model": f"{model_info.get('icon', '🤖')} {model_info.get('name', model_name)}",
+                "Status": result["status"],
+                "Probability": f"{result['probability']:.4f}" if result['probability'] is not None else "N/A",
+                "Time (ms)": result["inference_time_ms"]
+            })
+        
+        df = pd.DataFrame(summary_data)
+        st.dataframe(df, use_container_width=True)
+        
+        # Detailed view
+        with st.expander("📈 Detailed Model Breakdown"):
+            cols = st.columns(2)
+            for idx, (model_name, result) in enumerate(results.items()):
+                model_info = MODEL_INFO.get(model_name, {})
+                with cols[idx % 2]:
+                    st.markdown(f"**{model_info.get('icon', '🤖')} {model_info.get('name', model_name)}**")
+                    st.write(result["status"])
                     if result["probability"] is not None:
-                        st.metric("Probability", f"{result['probability']:.4f}")
-                with col3:
-                    st.metric("Time", f"{result['inference_time_ms']}ms")
+                        st.progress(min(result["probability"], 1.0))
+                    st.caption(f"Inference: {result['inference_time_ms']}ms")
 
 def display_sample_data():
     """Display sample data interface."""
@@ -454,9 +536,24 @@ def main():
         st.session_state.show_results = False
     
     # Sidebar navigation
-    st.sidebar.title("Navigation")
-    page = st.sidebar.radio("Go to", ["Home", "Single Model", "Compare All Models", "Sample Data"])
-    st.session_state.page = page
+    with st.sidebar:
+        st.title("🗺️ Navigation")
+        page = st.radio("Go to:", ["Home", "Single Model", "Compare All Models", "Sample Data"], label_visibility="collapsed")
+        st.session_state.page = page
+        
+        st.markdown("---")
+        st.markdown("### About")
+        st.info("""
+        **Credit Card Fraud Detection System**
+        
+        Uses ensemble learning with multiple ML models for accurate fraud detection.
+        
+        **Features:**
+        - 6+ machine learning models
+        - Real-time predictions
+        - Consensus voting mechanism
+        - Web-based interface
+        """)
     
     # Display header
     display_header()
@@ -464,20 +561,28 @@ def main():
     st.markdown("---")
     
     # Route to appropriate page
-    if page == "Home":
-        display_home()
-    elif page == "Single Model":
-        display_single_model()
-    elif page == "Compare All Models":
-        display_all_models()
-    elif page == "Sample Data":
-        display_sample_data()
+    try:
+        if page == "Home":
+            display_home()
+        elif page == "Single Model":
+            display_single_model()
+        elif page == "Compare All Models":
+            display_all_models()
+        elif page == "Sample Data":
+            display_sample_data()
+    except Exception as e:
+        st.error(f"An error occurred: {str(e)}")
+        st.error("Please try again or contact support.")
     
     # Footer
     st.markdown("---")
     st.markdown("""
-    <div style='text-align: center; color: #666;'>
-    <small>Credit Card Fraud Detection System | Powered by Streamlit | Multi-Model Ensemble</small>
+    <div style='text-align: center; color: #999; font-size: 0.85rem;'>
+    <small>
+    🛡️ Credit Card Fraud Detection System | Powered by Streamlit | Multi-Model Ensemble
+    <br>
+    © 2024 | All Rights Reserved
+    </small>
     </div>
     """, unsafe_allow_html=True)
 

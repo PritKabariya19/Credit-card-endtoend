@@ -1,3 +1,21 @@
+"""
+LEGACY FLASK BACKEND - FOR REFERENCE ONLY
+==========================================
+
+For Streamlit deployment on Streamlit Cloud or locally, use: app.py
+
+This file is the original Flask REST API backend.
+To run this Flask server locally (requires Flask and Flask-CORS):
+  
+  pip install flask flask-cors
+  python app2.py
+
+Then access at: http://localhost:5000
+
+For production Streamlit deployment, use:
+  streamlit run app.py
+"""
+
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import joblib
